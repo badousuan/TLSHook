@@ -34,9 +34,9 @@ d58974c Regenerate API/trace files for constness change by Jesse Hall · 9 years
  */
 
 namespace TLSHook {
-
-#define TLS_SLOT_OPENGL_API_LOWER  3
-#define TLS_SLOT_OPENGL_API_29     4
+// see https://android.googlesource.com/platform/bionic/+/froyo/libc/private/bionic_tls.h
+#define TLS_SLOT_OPENGL_API_LOWER  3  //defined by android system
+#define TLS_SLOT_OPENGL_API_29     4  //defined by android system
 
 struct HookFuncEntry {
   std::string name;
@@ -82,14 +82,14 @@ bool tls_hook_init() {
     int tlsIdx = api_level >= 29 ? TLS_SLOT_OPENGL_API_29 : TLS_SLOT_OPENGL_API_LOWER;
 
     // get tls ptr
-    tlsPtr = static_cast<size_t *>(getGlThreadSpecific(tlsIdx));
+    tlsPtr = static_cast<size_t *>(getGlThreadSpecific(tlsIdx)); //4代表openGL的API索引位置
     if (tlsPtr == nullptr) {
       LOGE("Error getGlThreadSpecific nullptr");
       return false;
     }
 
     int idx = 0;
-
+    //tlsPtr开始的函数指针列表为openGL的原始入口，entries.xx.in中的顺序就是函数指针的顺序
 #define GL_ENTRY(_r, _api, ...) hookMap[#_api] = idx++;
     if (api_level >= 28) {
 #include "entry/entries.28.in"
@@ -126,7 +126,7 @@ bool tls_hook_func(const char *symbol, void *new_func, void **old_func) {
 
   *old_func = entry.origin = reinterpret_cast<size_t *>(*slot);
   entry.hooked = static_cast<size_t *>(new_func);
-  *slot = reinterpret_cast<size_t>(new_func);
+  *slot = reinterpret_cast<size_t>(new_func); //重写函数指针为hook的new_func函数
   hookFunctions[entry.name] = entry;
 
   LOGI("Hook success: symbol: %s", symbol);
@@ -137,7 +137,7 @@ void tls_hook_clear() {
   for (auto &it : hookFunctions) {
     auto &entry = it.second;
     size_t *slot = tlsPtr + entry.idx;
-    *slot = reinterpret_cast<size_t>(entry.origin);
+    *slot = reinterpret_cast<size_t>(entry.origin); //恢复原始函数指针
   }
   hookFunctions.clear();
   LOGI("hook clear");
